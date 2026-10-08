@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QUẢN LÝ BANG HỘI – HUYNH ĐỆ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+  <style>
+    body { background-color: #0b0f19; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; }
+    .badge-diff-plus { color: #34d399; font-weight: 600; }
+    .badge-diff-zero { color: #f87171; font-weight: 600; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    .sortable-ghost { opacity: 0.3; background-color: #1e293b !important; }
+    .drag-handle { cursor: grab; }
+    .drag-handle:active { cursor: grabbing; }
+  </style>
+</head>
+<body class="p-3 md:p-6 min-h-screen flex flex-col">
+
+  <div class="max-w-[1550px] w-full mx-auto space-y-4 flex-1">
+    
+    <!-- Top Header -->
+    <header class="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-lg gap-4">
+      <div>
+        <h1 class="text-xl md:text-2xl font-bold text-amber-400 flex items-center gap-2">
+          ⚔️ QUẢN LÝ BANG HỘI – HUYNH ĐỆ
+        </h1>
+        <p class="text-xs text-slate-400 mt-1">Hệ thống giám sát nhân sự • Line & Pie Dashboard màu đồng bộ • Phân tích chiến lực tổ đội</p>
+      </div>
+      <div class="flex items-center gap-2 text-xs">
+        <span class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300">
+          Tổng Snapshot: <b id="header-snap-count" class="text-amber-400">0</b>
+        </span>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <div class="flex flex-wrap gap-2 border-b border-slate-800 pb-2">
+      <button onclick="switchTab('group-dashboard')" id="btn-tab-group-dashboard" class="px-4 py-2 text-xs md:text-sm font-semibold rounded-lg bg-amber-500 text-slate-950 transition">
+        🛡️ Dashboard Nhóm & Tổ Đội
+      </button>
+      <button onclick="switchTab('dashboard')" id="btn-tab-dashboard" class="px-4 py-2 text-xs md:text-sm font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+        🏆 Top 20 Cá Nhân
+      </button>
+      <button onclick="switchTab('comparison')" id="btn-tab-comparison" class="px-4 py-2 text-xs md:text-sm font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+        👥 So Sánh & Quản Lý Thành Viên
+      </button>
+      <button onclick="switchTab('storage')" id="btn-tab-storage" class="px-4 py-2 text-xs md:text-sm font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+        💾 Kho Dữ Liệu (Storage)
+      </button>
+      <button onclick="switchTab('backup')" id="btn-tab-backup" class="px-4 py-2 text-xs md:text-sm font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+        ⚙️ Sao Lưu & Mùa Mới
+      </button>
+    </div>
+
+    <!-- ================= TAB 1: GROUP DASHBOARD ================= -->
+    <div id="tab-group-dashboard" class="space-y-4">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <!-- Cột Trái: Line Model -->
+        <div class="lg:col-span-7 bg-slate-900 border border-slate-800 p-4 md:p-5 rounded-xl shadow-lg flex flex-col justify-between">
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-1">
+            <div>
+              <h2 class="text-sm md:text-base font-bold text-amber-400">Xu Hướng Chiến Công (Line Model)</h2>
+              <p class="text-xs text-slate-400">Tiến độ tăng trưởng chiến công của các nhóm qua các mốc</p>
+            </div>
+            <div class="text-[11px] text-slate-400 italic" id="group-chart-note"></div>
+          </div>
+          <div class="relative w-full h-[320px] md:h-[360px]">
+            <canvas id="groupLineChartCanvas"></canvas>
+          </div>
+        </div>
+
+        <!-- Cột Phải: Pie Model với chữ đồng bộ màu theo từng nhóm -->
+        <div class="lg:col-span-5 bg-slate-900 border border-slate-800 p-4 md:p-5 rounded-xl shadow-lg flex flex-col justify-between">
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-1">
+            <div>
+              <h2 class="text-sm md:text-base font-bold text-amber-400">Tỷ Trọng Chiến Công (Pie Model - Có %)</h2>
+              <p class="text-xs text-slate-400" id="group-pie-subtitle">Trực quan tổng chiến công tại mốc mới nhất</p>
+            </div>
+          </div>
+          <div class="relative w-full h-[320px] md:h-[360px] flex items-center justify-center">
+            <canvas id="groupPieChartCanvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bảng Tổng Kết Nhóm -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
+        <div class="p-3.5 border-b border-slate-800 flex flex-wrap justify-between items-center gap-2 bg-slate-950/60">
+          <div>
+            <h3 class="text-sm font-bold text-amber-400">Bảng Tổng Kết & Hiệu Suất Tác Chiến Theo Nhóm</h3>
+            <span id="group-summary-title" class="text-xs text-slate-400"></span>
+          </div>
+          <span class="text-xs text-slate-400">💡 <i>Bấm vào tiêu đề cột bên dưới để sắp xếp Tăng/Giảm</i></span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800 select-none">
+              <tr>
+                <th onclick="handleGroupSort('group')" class="p-3 cursor-pointer hover:text-amber-400 transition">
+                  <div class="flex items-center gap-1">Tên Nhóm <span id="gsort-icon-group">↕</span></div>
+                </th>
+                <th onclick="handleGroupSort('count')" class="p-3 text-center cursor-pointer hover:text-amber-400 transition">
+                  <div class="flex items-center justify-center gap-1">Quân Số <span id="gsort-icon-count">↕</span></div>
+                </th>
+                <th onclick="handleGroupSort('totalCC')" class="p-3 text-right cursor-pointer hover:text-amber-400 transition">
+                  <div class="flex items-center justify-end gap-1">Tổng Chiến Công <span id="gsort-icon-totalCC">▼</span></div>
+                </th>
+                <th onclick="handleGroupSort('deltaCC')" class="p-3 text-right cursor-pointer hover:text-amber-400 transition">
+                  <div class="flex items-center justify-end gap-1">Delta Tăng Trưởng <span id="gsort-icon-deltaCC">↕</span></div>
+                </th>
+                <th onclick="handleGroupSort('avgCC')" class="p-3 text-right cursor-pointer hover:text-amber-400 transition">
+                  <div class="flex items-center justify-end gap-1">Chiến Công TB/Người <span id="gsort-icon-avgCC">↕</span></div>
+                </th>
+                <th onclick="handleGroupSort('totalCH')" class="p-3 text-right cursor-pointer hover:text-amber-400 transition">
+                  <div class="flex items-center justify-end gap-1">Tổng Cống Hiến <span id="gsort-icon-totalCH">↕</span></div>
+                </th>
+                <th onclick="handleGroupSort('avgTL')" class="p-3 text-right cursor-pointer hover:text-amber-400 transition">
+                  <div class="flex items-center justify-end gap-1">Thế Lực TB <span id="gsort-icon-avgTL">↕</span></div>
+                </th>
+                <th onclick="handleGroupSort('afkCount')" class="p-3 text-center cursor-pointer hover:text-amber-400 transition">
+                  <div class="flex items-center justify-center gap-1">Cảnh Báo AFK <span id="gsort-icon-afkCount">↕</span></div>
+                </th>
+              </tr>
+            </thead>
+            <tbody id="group-summary-body" class="divide-y divide-slate-800/60"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= TAB 2: TOP 20 INDIVIDUAL ================= -->
+    <div id="tab-dashboard" class="hidden space-y-4">
+      <div class="bg-slate-900 border border-slate-800 p-4 md:p-5 rounded-xl shadow-lg">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-3 gap-2">
+          <div>
+            <h2 class="text-base font-bold text-amber-400">Biểu đồ Xu hướng Chiến công (Top 20 Cá Nhân)</h2>
+            <p class="text-xs text-slate-400">Sự thay đổi chiến công của các chủ lực qua các mốc snapshot</p>
+          </div>
+          <div class="text-xs text-slate-400 italic" id="chart-note"></div>
+        </div>
+        <div class="relative w-full h-[380px]">
+          <canvas id="lineChartCanvas"></canvas>
+        </div>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
+        <div class="p-3 border-b border-slate-800 flex justify-between items-center">
+          <h3 class="text-sm font-bold text-amber-400">Bảng Phong Thần: Top 20 Chiến Công Mới Nhất</h3>
+          <span id="top20-snapshot-title" class="text-xs text-slate-400"></span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800">
+              <tr>
+                <th class="p-3 text-center">Hạng</th>
+                <th class="p-3">Thành viên</th>
+                <th class="p-3">Nhóm</th>
+                <th class="p-3">Châu</th>
+                <th class="p-3 text-right">Chiến Công Tổng</th>
+                <th class="p-3 text-right">Cống Hiến</th>
+                <th class="p-3 text-right">Thế Lực</th>
+                <th class="p-3 text-right">Trợ Công</th>
+              </tr>
+            </thead>
+            <tbody id="top20-body" class="divide-y divide-slate-800/60"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= TAB 3: SO SÁNH & QUẢN LÝ THÀNH VIÊN ================= -->
+    <div id="tab-comparison" class="hidden space-y-4">
+      <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-wrap items-center gap-4">
+        <div class="flex-1 min-w-[200px]">
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Mốc cũ (T1 - Trước):</label>
+          <select id="select-t1" class="w-full bg-slate-950 border border-slate-700 text-xs rounded-md px-3 py-2 text-slate-200"></select>
+        </div>
+        <div class="flex-1 min-w-[200px]">
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Mốc mới (T2 - Sau):</label>
+          <select id="select-t2" class="w-full bg-slate-950 border border-slate-700 text-xs rounded-md px-3 py-2 text-slate-200"></select>
+        </div>
+        <div class="w-full md:w-auto self-end">
+          <button onclick="calculateAndRenderDiff()" class="w-full md:w-auto px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-md text-xs transition">
+            So sánh biến động
+          </button>
+        </div>
+      </div>
+
+      <div id="diff-metrics" class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="bg-slate-900 border border-slate-800 p-3 rounded-lg text-center">
+          <div class="text-[11px] text-slate-400">Quân số mốc mới</div>
+          <div id="metric-total" class="text-lg font-bold text-amber-400 mt-1">0</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 p-3 rounded-lg text-center">
+          <div class="text-[11px] text-slate-400">Gia nhập mới</div>
+          <div id="metric-new" class="text-lg font-bold text-emerald-400 mt-1">0</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 p-3 rounded-lg text-center">
+          <div class="text-[11px] text-slate-400">Đã rời bang</div>
+          <div id="metric-left" class="text-lg font-bold text-rose-400 mt-1">0</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 p-3 rounded-lg text-center">
+          <div class="text-[11px] text-slate-400">Cảnh báo AFK (CC = 0)</div>
+          <div id="metric-afk" class="text-lg font-bold text-red-500 mt-1">0</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 p-3 rounded-lg text-center col-span-2 md:col-span-1">
+          <div class="text-[11px] text-slate-400">Tổng Delta Chiến Công</div>
+          <div id="metric-delta-cc" class="text-lg font-bold text-sky-400 mt-1">0</div>
+        </div>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
+        <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-950/60">
+          <span class="text-xs text-slate-400">💡 <i>Bấm vào tiêu đề cột để sắp xếp (Sort). Sử dụng ô lọc ngay dưới tiêu đề để lọc theo cột.</i></span>
+          <button onclick="resetDiffFilters()" class="text-xs text-amber-400 hover:underline">Xóa tất cả bộ lọc</button>
+        </div>
+
+        <div class="overflow-x-auto max-h-[640px]">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-950 text-slate-400 font-semibold sticky top-0 z-20 border-b border-slate-800 select-none">
+              <tr>
+                <th onclick="handleSort('name')" class="p-2.5 cursor-pointer hover:text-amber-400 transition">
+                  <div class="flex items-center gap-1">Thành viên <span id="sort-icon-name">↕</span></div>
+                </th>
+                <th onclick="handleSort('group')" class="p-2.5 cursor-pointer hover:text-amber-400 transition">
+                  <div class="flex items-center gap-1">Nhóm <span id="sort-icon-group">↕</span></div>
+                </th>
+                <th onclick="handleSort('region')" class="p-2.5 cursor-pointer hover:text-amber-400 transition">
+                  <div class="flex items-center gap-1">Châu <span id="sort-icon-region">↕</span></div>
+                </th>
+                <th onclick="handleSort('deltaCC')" class="p-2.5 text-right cursor-pointer hover:text-amber-400 transition">
+                  <div class="flex items-center justify-end gap-1">Chiến Công (+Delta) <span id="sort-icon-deltaCC">▼</span></div>
+                </th>
+                <th onclick="handleSort('deltaCH')" class="p-2.5 text-right cursor-pointer hover:text-amber-400 transition">
+                  <div class="flex items-center justify-end gap-1">Cống Hiến (+Delta) <span id="sort-icon-deltaCH">↕</span></div>
+                </th>
+                <th onclick="handleSort('theLuc')" class="p-2.5 text-right cursor-pointer hover:text-amber-400 transition">
+                  <div class="flex items-center justify-end gap-1">Thế Lực (+Delta) <span id="sort-icon-theLuc">↕</span></div>
+                </th>
+                <th onclick="handleSort('status')" class="p-2.5 text-center cursor-pointer hover:text-amber-400 transition">
+                  <div class="flex items-center justify-center gap-1">Trạng thái <span id="sort-icon-status">↕</span></div>
+                </th>
+                <th onclick="handleSort('attendance')" class="p-2.5 cursor-pointer hover:text-amber-400 transition">
+                  <div class="flex items-center gap-1">Điểm danh <span id="sort-icon-attendance">↕</span></div>
+                </th>
+                <th class="p-2.5">Ghi chú cán bộ</th>
+              </tr>
+
+              <tr class="bg-slate-900 border-t border-slate-800 text-[11px] font-normal">
+                <th class="p-2">
+                  <input type="text" id="filter-col-name" placeholder="Lọc tên..." oninput="renderDiffTable()" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200 focus:outline-none focus:border-amber-400">
+                </th>
+                <th class="p-2">
+                  <select id="filter-col-group" onchange="renderDiffTable()" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-slate-200 focus:outline-none focus:border-amber-400">
+                    <option value="ALL">Tất cả</option>
+                  </select>
+                </th>
+                <th class="p-2">
+                  <select id="filter-col-region" onchange="renderDiffTable()" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-slate-200 focus:outline-none focus:border-amber-400">
+                    <option value="ALL">Tất cả</option>
+                  </select>
+                </th>
+                <th class="p-2 text-right">
+                  <input type="number" id="filter-col-mincc" placeholder="Delta CC min" oninput="renderDiffTable()" class="w-full text-right bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200 focus:outline-none focus:border-amber-400">
+                </th>
+                <th class="p-2 text-right"></th>
+                <th class="p-2 text-right"></th>
+                <th class="p-2">
+                  <select id="filter-col-status" onchange="renderDiffTable()" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-slate-200 focus:outline-none focus:border-amber-400">
+                    <option value="ALL">Tất cả</option>
+                    <option value="AFK">AFK</option>
+                    <option value="NEW">Mới vào</option>
+                    <option value="LEFT">Đã rời</option>
+                    <option value="CHANGED_GROUP">Đổi nhóm</option>
+                    <option value="NORMAL">Bình thường</option>
+                  </select>
+                </th>
+                <th class="p-2">
+                  <select id="filter-col-attendance" onchange="renderDiffTable()" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-slate-200 focus:outline-none focus:border-amber-400">
+                    <option value="ALL">Tất cả</option>
+                    <option value="DIEM_DANH">Đủ</option>
+                    <option value="XIN_PHEP">Xin phép</option>
+                    <option value="VANG_MAT">Vắng</option>
+                    <option value="DU_BI">Dự bị</option>
+                  </select>
+                </th>
+                <th class="p-2">
+                  <input type="text" id="filter-col-note" placeholder="Tìm ghi chú..." oninput="renderDiffTable()" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200 focus:outline-none focus:border-amber-400">
+                </th>
+              </tr>
+            </thead>
+            <tbody id="diff-table-body" class="divide-y divide-slate-800/60"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= TAB 4: KHO DỮ LIỆU (STORAGE) ================= -->
+    <div id="tab-storage" class="hidden space-y-4">
+      <div class="bg-slate-900 border border-slate-800 p-4 md:p-5 rounded-xl shadow-lg">
+        <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider mb-2">Tải Lên Snapshot Mới</h2>
+        <p class="text-xs text-slate-400 mb-3">Tên Mốc Snapshot sẽ tự động chuẩn hóa sang định dạng <b>DD/MM/YYYY - TIME</b> từ file game.</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Chọn file CSV game:</label>
+            <input type="file" id="upload-csv-file" accept=".csv" onchange="onCSVFileSelected(event)" class="block w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-400 cursor-pointer">
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Tên Mốc Snapshot (Tự động tạo):</label>
+            <input type="text" id="upload-label" placeholder="VD: 16/09/2026 - 20:30:56" class="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-400">
+          </div>
+          <div class="self-end">
+            <button onclick="handleUploadSnapshot()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-4 rounded-md text-xs transition">
+              Lưu Vào Bộ Nhớ Storage
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
+        <div class="p-3 border-b border-slate-800 flex justify-between items-center">
+          <div>
+            <h3 class="text-sm font-bold text-amber-400">Danh Sách Snapshot Đã Lưu Trữ</h3>
+            <p class="text-xs text-slate-400">Kéo biểu tượng <b>☰</b> lên/xuống để thay đổi thứ tự thời gian của các snapshot.</p>
+          </div>
+          <span class="text-xs text-emerald-400 font-semibold bg-emerald-950 px-2.5 py-1 rounded border border-emerald-800">Kéo thả đang kích hoạt</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800">
+              <tr>
+                <th class="p-3 text-center w-12">Sắp xếp</th>
+                <th class="p-3">Tên Mốc Snapshot (DD/MM/YYYY - TIME)</th>
+                <th class="p-3">Tên File Gốc</th>
+                <th class="p-3">Thời Điểm Upload</th>
+                <th class="p-3 text-center">Quân Số</th>
+                <th class="p-3 text-center">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="storage-table-body" class="divide-y divide-slate-800/60"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= TAB 5: SAO LƯU & MÙA MỚI ================= -->
+    <div id="tab-backup" class="hidden space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg space-y-3">
+          <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider">Trích Xuất / Khôi Phục Dữ Liệu (Backup)</h2>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Xuất toàn bộ snapshot, số liệu lịch sử và ghi chú điểm danh thành một file JSON duy nhất để lưu trữ an toàn hoặc chuyển sang máy khác.
+          </p>
+          <div class="flex flex-col sm:flex-row gap-3 pt-2">
+            <button onclick="exportFullBackup()" class="flex-1 bg-sky-600 hover:bg-sky-500 text-white font-bold py-2.5 px-4 rounded-md text-xs transition">
+              📥 Xuất File Backup (JSON)
+            </button>
+            <label class="flex-1 bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold py-2.5 px-4 rounded-md text-xs transition text-center cursor-pointer border border-slate-700">
+              📤 Nhập File Backup
+              <input type="file" id="import-backup-file" accept=".json" onchange="importBackupData(event)" class="hidden">
+            </label>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 border border-rose-900/40 p-5 rounded-xl shadow-lg space-y-3">
+          <h2 class="text-sm font-bold text-rose-400 uppercase tracking-wider">Làm Mới Toàn Bộ (Refresh All - Mùa Giải Mới)</h2>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Dọn dẹp sạch toàn bộ các snapshot, số liệu và ghi chú cũ để sẵn sàng bước vào mùa giải mới.
+          </p>
+          <div class="pt-2">
+            <button onclick="confirmResetAll()" class="w-full bg-rose-600/80 hover:bg-rose-600 text-white font-bold py-2.5 px-4 rounded-md text-xs transition border border-rose-500">
+              🗑️ Xóa Sạch Dữ Liệu (Bắt đầu mùa mới)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ================= STATE & CONFIGURATION =================
+    const STORAGE_KEY = 'ALLIANCE_HUB_DATA_V4';
+    let appState = {
+      snapshots: [],    // Array of { id, title, fileName, uploadedAt, data: [...] }
+      memberNotes: {}   // { [memberName]: { attendance, note } }
+    };
+    let chartInstance = null;
+    let groupChartInstance = null;
+    let groupPieChartInstance = null;
+    let currentGroupStats = [];
+    let groupSortState = { field: 'totalCC', dir: 'desc' };
+    let diffResults = [];
+    let sortState = { field: 'deltaCC', dir: 'desc' };
+    let sortableStorage = null;
+
+    // Chuẩn hóa tên mốc snapshot sang DD/MM/YYYY - TIME
+    function extractFormattedDate(rawName) {
+      if (!rawName) return '';
+      const matchCN = rawName.match(/(\d{4})年(\d{1,2})月(\d{1,2})日(\d{1,2})时(\d{1,2})分(\d{1,2})秒/);
+      if (matchCN) {
+        const [_, y, m, d, h, min, s] = matchCN;
+        const pad = (n) => n.toString().padStart(2, '0');
+        return `${pad(d)}/${pad(m)}/${y} - ${pad(h)}:${pad(min)}:${pad(s)}`;
+      }
+      const matchStd = rawName.match(/(\d{4})[-_](\d{2})[-_](\d{2})[-_ ](\d{2})[-_:](\d{2})[-_:](\d{2})/);
+      if (matchStd) {
+        const [_, y, m, d, h, min, s] = matchStd;
+        return `${d}/${m}/${y} - ${h}:${min}:${s}`;
+      }
+      return rawName.replace(/\.csv$/i, '');
+    }
+
+    function onCSVFileSelected(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const formatted = extractFormattedDate(file.name);
+        document.getElementById('upload-label').value = formatted;
+      }
+    }
+
+    // ================= STORAGE MANAGEMENT & SORTABLE =================
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          appState = JSON.parse(raw);
+          if (!appState.snapshots) appState.snapshots = [];
+          if (!appState.memberNotes) appState.memberNotes = {};
+        }
+      } catch (e) {
+        console.error("Lỗi khi load state:", e);
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      updateUI();
+    }
+
+    function initSortableStorage() {
+      const tbody = document.getElementById('storage-table-body');
+      if (sortableStorage) sortableStorage.destroy();
+
+      sortableStorage = new Sortable(tbody, {
+        handle: '.drag-handle',
+        animation: 150,
+        ghostClass: 'sortable-ghost',
+        onEnd: function (evt) {
+          const moved = appState.snapshots.splice(evt.oldIndex, 1)[0];
+          appState.snapshots.splice(evt.newIndex, 0, moved);
+          saveState();
+          renderStorageTable();
+        }
+      });
+    }
+
+    // ================= TAB NAVIGATION =================
+    function switchTab(tabId) {
+      ['group-dashboard', 'dashboard', 'comparison', 'storage', 'backup'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.add('hidden');
+        const btn = document.getElementById(`btn-tab-${t}`);
+        btn.classList.remove('bg-amber-500', 'text-slate-950');
+        btn.classList.add('bg-slate-800', 'text-slate-300');
+      });
+
+      document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`btn-tab-${tabId}`);
+      activeBtn.classList.remove('bg-slate-800', 'text-slate-300');
+      activeBtn.classList.add('bg-amber-500', 'text-slate-950');
+
+      if (tabId === 'group-dashboard') renderGroupDashboard();
+      if (tabId === 'dashboard') renderDashboard();
+      if (tabId === 'storage') renderStorageTable();
+      if (tabId === 'comparison') updateComparisonDropdowns();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      updateUI();
+      renderGroupDashboard();
+    });
+
+    function updateUI() {
+      document.getElementById('header-snap-count').innerText = appState.snapshots.length;
+    }
+
+    // ================= STORAGE / UPLOAD =================
+    function handleUploadSnapshot() {
+      const fileInput = document.getElementById('upload-csv-file');
+      const labelInput = document.getElementById('upload-label');
+      const file = fileInput.files[0];
+
+      if (!file) {
+        alert("Vui lòng chọn file CSV xuất từ game!");
+        return;
+      }
+
+      const title = labelInput.value.trim() || extractFormattedDate(file.name);
+
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const records = [];
+          results.data.forEach(row => {
+            const cleanRow = {};
+            Object.keys(row).forEach(k => {
+              cleanRow[k.trim()] = typeof row[k] === 'string' ? row[k].trim() : row[k];
+            });
+
+            const memberName = cleanRow['Thành viên'];
+            if (memberName) {
+              records.push({
+                name: memberName,
+                group: cleanRow['Nhóm'] || 'Chưa chia nhóm',
+                region: cleanRow['Thuộc Châu'] || '-',
+                rankAlliance: cleanRow['Xếp hạng cống hiến đồng minh'] || '-',
+                chienCong: Number(cleanRow['C.CôngTổng lượng'] || 0),
+                congHien: Number(cleanRow['Cống hiếnTổng lượng'] || 0),
+                theLuc: Number(cleanRow['Điểm T.Lực'] || 0),
+                troCong: Number(cleanRow['Trợ côngTổng lượng'] || 0),
+                quyenTang: Number(cleanRow['Quyên tặngTổng lượng'] || 0)
+              });
+            }
+          });
+
+          if (records.length === 0) {
+            alert("File CSV không chứa dữ liệu hợp lệ!");
+            return;
+          }
+
+          const newSnap = {
+            id: 'snap_' + Date.now(),
+            title: title,
+            fileName: file.name,
+            uploadedAt: new Date().toISOString(),
+            data: records
+          };
+
+          appState.snapshots.push(newSnap);
+          saveState();
+
+          fileInput.value = '';
+          labelInput.value = '';
+          alert(`Đã lưu mốc "${title}" (${records.length} thành viên)!`);
+          renderStorageTable();
+        },
+        error: (err) => alert("Lỗi đọc file: " + err.message)
+      });
+    }
+
+    function deleteSnapshot(snapId) {
+      if (confirm("Bạn có chắc chắn muốn xóa mốc dữ liệu này?")) {
+        appState.snapshots = appState.snapshots.filter(s => s.id !== snapId);
+        saveState();
+        renderStorageTable();
+      }
+    }
+
+    function renderStorageTable() {
+      const tbody = document.getElementById('storage-table-body');
+      if (appState.snapshots.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-500">Chưa có snapshot nào được lưu.</td></tr>`;
+        return;
+      }
+
+      let html = '';
+      appState.snapshots.forEach((snap) => {
+        const timeStr = new Date(snap.uploadedAt).toLocaleString('vi-VN');
+        html += `
+          <tr class="hover:bg-slate-800/40 border-b border-slate-800/40 transition">
+            <td class="p-3 text-center drag-handle text-slate-500 hover:text-amber-400 select-none text-base">☰</td>
+            <td class="p-3 font-semibold text-amber-300 font-mono">${snap.title}</td>
+            <td class="p-3 text-slate-400 font-mono text-[11px]">${snap.fileName}</td>
+            <td class="p-3 text-slate-400">${timeStr}</td>
+            <td class="p-3 text-center"><span class="px-2 py-0.5 rounded bg-slate-800 text-amber-400 font-bold">${snap.data.length}</span></td>
+            <td class="p-3 text-center">
+              <button onclick="deleteSnapshot('${snap.id}')" class="px-2 py-1 rounded bg-rose-950 text-rose-400 border border-rose-800 hover:bg-rose-900 transition text-[11px]">
+                Xóa
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+      initSortableStorage();
+    }
+
+    // ================= TAB 1: GROUP DASHBOARD (PIE VỚI CHỮ ĐỒNG BỘ MÀU) =================
+    function renderGroupDashboard() {
+      const tbody = document.getElementById('group-summary-body');
+      const title = document.getElementById('group-summary-title');
+      const note = document.getElementById('group-chart-note');
+      const pieSub = document.getElementById('group-pie-subtitle');
+
+      if (appState.snapshots.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-500">Chưa có dữ liệu snapshot để phân tích nhóm.</td></tr>`;
+        if (groupChartInstance) groupChartInstance.destroy();
+        if (groupPieChartInstance) groupPieChartInstance.destroy();
+        return;
+      }
+
+      const snapCur = appState.snapshots[appState.snapshots.length - 1];
+      const snapPrev = appState.snapshots.length >= 2 ? appState.snapshots[appState.snapshots.length - 2] : null;
+
+      title.innerText = `Mốc hiện tại: ${snapCur.title} ${snapPrev ? `(So với: ${snapPrev.title})` : ''}`;
+      pieSub.innerText = `Tỷ trọng Chiến Công tại mốc: ${snapCur.title}`;
+      note.innerText = `Dữ liệu qua ${appState.snapshots.length} mốc snapshot`;
+
+      const groupNames = Array.from(new Set(snapCur.data.map(m => m.group))).sort();
+
+      currentGroupStats = groupNames.map(g => {
+        const curMembers = snapCur.data.filter(m => m.group === g);
+        const count = curMembers.length;
+        const totalCC = curMembers.reduce((sum, m) => sum + m.chienCong, 0);
+        const totalCH = curMembers.reduce((sum, m) => sum + m.congHien, 0);
+        const avgTL = count > 0 ? Math.round(curMembers.reduce((sum, m) => sum + m.theLuc, 0) / count) : 0;
+        const avgCC = count > 0 ? Math.round(totalCC / count) : 0;
+
+        let deltaCC = 0;
+        let afkCount = 0;
+
+        if (snapPrev) {
+          const prevMap = new Map(snapPrev.data.map(m => [m.name, m]));
+          curMembers.forEach(m => {
+            const prev = prevMap.get(m.name);
+            const dCC = prev ? m.chienCong - prev.chienCong : m.chienCong;
+            if (dCC <= 0) afkCount++;
+            deltaCC += dCC;
+          });
+        }
+
+        return { group: g, count, totalCC, deltaCC, avgCC, totalCH, avgTL, afkCount, hasPrev: !!snapPrev };
+      });
+
+      renderGroupSummaryTable();
+      renderGroupLineChart(groupNames);
+      renderGroupPieChart(currentGroupStats);
+    }
+
+    function handleGroupSort(field) {
+      if (groupSortState.field === field) {
+        groupSortState.dir = groupSortState.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        groupSortState.field = field;
+        groupSortState.dir = (field === 'group') ? 'asc' : 'desc';
+      }
+      updateGroupSortIcons();
+      renderGroupSummaryTable();
+    }
+
+    function updateGroupSortIcons() {
+      ['group', 'count', 'totalCC', 'deltaCC', 'avgCC', 'totalCH', 'avgTL', 'afkCount'].forEach(f => {
+        const iconEl = document.getElementById(`gsort-icon-${f}`);
+        if (!iconEl) return;
+        if (groupSortState.field === f) {
+          iconEl.innerText = groupSortState.dir === 'asc' ? '▲' : '▼';
+          iconEl.className = 'text-amber-400 font-bold';
+        } else {
+          iconEl.innerText = '↕';
+          iconEl.className = 'text-slate-600';
+        }
+      });
+    }
+
+    function renderGroupSummaryTable() {
+      const tbody = document.getElementById('group-summary-body');
+      
+      const sorted = [...currentGroupStats].sort((a, b) => {
+        let valA = a[groupSortState.field];
+        let valB = b[groupSortState.field];
+
+        if (typeof valA === 'string') {
+          return groupSortState.dir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        }
+        return groupSortState.dir === 'asc' ? (valA - valB) : (valB - valA);
+      });
+
+      let html = '';
+      sorted.forEach(st => {
+        const deltaFormatted = st.hasPrev 
+          ? `<span class="${st.deltaCC > 0 ? 'badge-diff-plus' : 'text-slate-500'}">+${st.deltaCC.toLocaleString('vi-VN')}</span>`
+          : '<span class="text-slate-500">-</span>';
+
+        html += `
+          <tr class="hover:bg-slate-800/40 border-b border-slate-800/40 transition">
+            <td class="p-3 font-bold text-amber-300 font-mono">${st.group}</td>
+            <td class="p-3 text-center font-semibold text-slate-200">${st.count}</td>
+            <td class="p-3 text-right font-mono font-bold text-slate-100">${st.totalCC.toLocaleString('vi-VN')}</td>
+            <td class="p-3 text-right font-mono">${deltaFormatted}</td>
+            <td class="p-3 text-right font-mono text-sky-400 font-semibold">${st.avgCC.toLocaleString('vi-VN')}</td>
+            <td class="p-3 text-right font-mono text-slate-300">${st.totalCH.toLocaleString('vi-VN')}</td>
+            <td class="p-3 text-right font-mono text-slate-300">${st.avgTL.toLocaleString('vi-VN')}</td>
+            <td class="p-3 text-center">
+              ${st.afkCount > 0 ? `<span class="px-2 py-0.5 rounded text-[11px] bg-red-950 text-red-400 border border-red-800 font-bold">${st.afkCount}</span>` : '<span class="text-emerald-400 font-bold">0</span>'}
+            </td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+      updateGroupSortIcons();
+    }
+
+    function renderGroupLineChart(groupNames) {
+      const ctx = document.getElementById('groupLineChartCanvas').getContext('2d');
+      const labels = appState.snapshots.map(s => s.title);
+      const palette = ['#f59e0b', '#38bdf8', '#34d399', '#f43f5e', '#a855f7', '#ec4899', '#14b8a6', '#eab308'];
+
+      const datasets = groupNames.map((grp, idx) => {
+        const points = appState.snapshots.map(snap => {
+          const membersInGroup = snap.data.filter(m => m.group === grp);
+          return membersInGroup.reduce((sum, m) => sum + m.chienCong, 0);
+        });
+
+        return {
+          label: grp,
+          data: points,
+          borderColor: palette[idx % palette.length],
+          backgroundColor: palette[idx % palette.length],
+          borderWidth: 2.5,
+          pointRadius: 4,
+          tension: 0.2,
+          fill: false
+        };
+      });
+
+      if (groupChartInstance) groupChartInstance.destroy();
+      groupChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { boxWidth: 10, color: '#94a3b8', font: { size: 10, weight: 'bold' } } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ` ${ctx.dataset.label}: ${Number(ctx.parsed.y).toLocaleString('vi-VN')} Chiến Công`
+              }
+            }
+          },
+          scales: {
+            x: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+            y: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8', callback: v => Number(v).toLocaleString('vi-VN') } }
+          }
+        }
+      });
+    }
+
+    // PLUGIN VẼ TRỰC TIẾP TỶ LỆ % TRÊN MỖI LÁT CẮT CỦA BIỂU ĐỒ PIE
+    const piePercentagePlugin = {
+      id: 'piePercentageLabel',
+      afterDraw: (chart) => {
+        const { ctx } = chart;
+        chart.data.datasets.forEach((dataset, i) => {
+          const meta = chart.getDatasetMeta(i);
+          const total = dataset.data.reduce((a, b) => a + b, 0);
+          if (!total) return;
+
+          meta.data.forEach((element, index) => {
+            const val = dataset.data[index];
+            const pct = (val / total) * 100;
+            if (pct < 2) return; // Ẩn nhãn lát cắt quá nhỏ tránh đè chữ
+
+            let posX, posY;
+            if (typeof element.tooltipPosition === 'function') {
+              const pos = element.tooltipPosition();
+              posX = pos.x;
+              posY = pos.y;
+            } else {
+              const props = element.getProps(['startAngle', 'endAngle', 'innerRadius', 'outerRadius', 'x', 'y'], true);
+              const angle = props.startAngle + (props.endAngle - props.startAngle) / 2;
+              const r = (props.innerRadius + props.outerRadius) / 2;
+              posX = props.x + Math.cos(angle) * r;
+              posY = props.y + Math.sin(angle) * r;
+            }
+
+            ctx.save();
+            ctx.font = 'bold 11px system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(15, 23, 42, 0.9)';
+            ctx.strokeText(`${pct.toFixed(1)}%`, posX, posY);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(`${pct.toFixed(1)}%`, posX, posY);
+            ctx.restore();
+          });
+        });
+      }
+    };
+
+    function renderGroupPieChart(groupStats) {
+      const ctx = document.getElementById('groupPieChartCanvas').getContext('2d');
+      const palette = ['#f59e0b', '#38bdf8', '#34d399', '#f43f5e', '#a855f7', '#ec4899', '#14b8a6', '#eab308'];
+
+      const labels = groupStats.map(g => g.group);
+      const data = groupStats.map(g => g.totalCC);
+      const totalSum = data.reduce((a, b) => a + b, 0);
+
+      if (groupPieChartInstance) groupPieChartInstance.destroy();
+      groupPieChartInstance = new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: data,
+            backgroundColor: palette.slice(0, labels.length),
+            borderColor: '#0b0f19',
+            borderWidth: 2,
+            hoverOffset: 6
+          }]
+        },
+        plugins: [piePercentagePlugin],
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: {
+                boxWidth: 14,
+                font: { size: 12, weight: '600' },
+                // Chỉ định hàm lấy màu động theo index để tương thích mọi phiên bản Chart.js
+                color: function(context) {
+                  return palette[context.index % palette.length];
+                },
+                // Đổi màu fontColor của từng nhãn tương ứng với màu của lát cắt
+                generateLabels: function(chart) {
+                  const chartData = chart.data;
+                  if (chartData.labels.length && chartData.datasets.length) {
+                    return chartData.labels.map((label, i) => {
+                      const val = chartData.datasets[0].data[i];
+                      const pct = totalSum > 0 ? ((val / totalSum) * 100).toFixed(1) : '0';
+                      const color = palette[i % palette.length];
+                      return {
+                        text: `${label} (${pct}%)`,
+                        fillStyle: color,
+                        strokeStyle: color,
+                        fontColor: color, // Gán trực tiếp màu chữ theo đúng lát cắt
+                        color: color,     // Hỗ trợ Chart.js v4
+                        lineWidth: 1,
+                        hidden: !chart.getDataVisibility(i),
+                        index: i
+                      };
+                    });
+                  }
+                  return [];
+                }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const val = context.raw || 0;
+                  const pct = totalSum > 0 ? ((val / totalSum) * 100).toFixed(1) : 0;
+                  return ` ${context.label}: ${val.toLocaleString('vi-VN')} Chiến Công (${pct}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // ================= TAB 2: INDIVIDUAL DASHBOARD =================
+    function renderDashboard() {
+      const tbody = document.getElementById('top20-body');
+      const topTitle = document.getElementById('top20-snapshot-title');
+
+      if (appState.snapshots.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-500">Chưa có dữ liệu snapshot nào trong storage.</td></tr>`;
+        if (chartInstance) chartInstance.destroy();
+        return;
+      }
+
+      const latestSnap = appState.snapshots[appState.snapshots.length - 1];
+      topTitle.innerText = `Căn cứ theo mốc: ${latestSnap.title}`;
+
+      const sorted = [...latestSnap.data].sort((a, b) => b.chienCong - a.chienCong);
+      const top20 = sorted.slice(0, 20);
+
+      let html = '';
+      top20.forEach((m, idx) => {
+        let badge = `<span class="font-bold text-slate-400">${idx + 1}</span>`;
+        if (idx === 0) badge = `<span class="text-amber-400 font-bold text-sm">🥇 1</span>`;
+        if (idx === 1) badge = `<span class="text-slate-200 font-bold text-sm">🥈 2</span>`;
+        if (idx === 2) badge = `<span class="text-amber-600 font-bold text-sm">🥉 3</span>`;
+
+        html += `
+          <tr class="hover:bg-slate-800/40 border-b border-slate-800/40 transition">
+            <td class="p-3 text-center">${badge}</td>
+            <td class="p-3 font-semibold text-slate-200">${m.name}</td>
+            <td class="p-3"><span class="px-2 py-0.5 rounded bg-slate-800 text-amber-300 font-mono text-[11px]">${m.group}</span></td>
+            <td class="p-3 text-slate-400">${m.region}</td>
+            <td class="p-3 text-right font-semibold text-amber-400 font-mono">${m.chienCong.toLocaleString('vi-VN')}</td>
+            <td class="p-3 text-right font-mono text-slate-300">${m.congHien.toLocaleString('vi-VN')}</td>
+            <td class="p-3 text-right font-mono text-slate-300">${m.theLuc.toLocaleString('vi-VN')}</td>
+            <td class="p-3 text-right font-mono text-slate-400">${m.troCong.toLocaleString('vi-VN')}</td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+      renderTop20LineChart(top20);
+    }
+
+    function renderTop20LineChart(top20Members) {
+      const ctx = document.getElementById('lineChartCanvas').getContext('2d');
+      const labels = appState.snapshots.map(s => s.title);
+      const topNames = top20Members.map(m => m.name);
+      const colors = ['#f59e0b', '#38bdf8', '#34d399', '#f43f5e', '#a855f7', '#ec4899', '#14b8a6', '#eab308', '#6366f1', '#84cc16', '#06b6d4', '#d946ef', '#f97316', '#10b981', '#8b5cf6', '#ef4444', '#0284c7', '#22c55e', '#e11d48', '#64748b'];
+
+      const datasets = topNames.map((name, i) => ({
+        label: name,
+        data: appState.snapshots.map(snap => {
+          const found = snap.data.find(m => m.name === name);
+          return found ? found.chienCong : null;
+        }),
+        borderColor: colors[i % colors.length],
+        backgroundColor: colors[i % colors.length],
+        borderWidth: 2,
+        pointRadius: 3,
+        tension: 0.25,
+        fill: false
+      }));
+
+      if (chartInstance) chartInstance.destroy();
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'top', labels: { boxWidth: 10, color: '#94a3b8', font: { size: 10 } } } },
+          scales: {
+            x: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8' } },
+            y: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8', callback: v => Number(v).toLocaleString('vi-VN') } }
+          }
+        }
+      });
+    }
+
+    // ================= TAB 3: SO SÁNH & QUẢN LÝ (SORT & FILTER) =================
+    function updateComparisonDropdowns() {
+      const selT1 = document.getElementById('select-t1');
+      const selT2 = document.getElementById('select-t2');
+      selT1.innerHTML = '';
+      selT2.innerHTML = '';
+
+      if (appState.snapshots.length === 0) {
+        selT1.innerHTML = '<option value="">Chưa có dữ liệu</option>';
+        selT2.innerHTML = '<option value="">Chưa có dữ liệu</option>';
+        return;
+      }
+
+      appState.snapshots.forEach((snap, idx) => {
+        selT1.innerHTML += `<option value="${snap.id}">${idx + 1}. ${snap.title}</option>`;
+        selT2.innerHTML += `<option value="${snap.id}">${idx + 1}. ${snap.title}</option>`;
+      });
+
+      if (appState.snapshots.length >= 2) {
+        selT1.selectedIndex = appState.snapshots.length - 2;
+        selT2.selectedIndex = appState.snapshots.length - 1;
+      } else {
+        selT1.selectedIndex = 0;
+        selT2.selectedIndex = 0;
+      }
+
+      calculateAndRenderDiff();
+    }
+
+    function calculateAndRenderDiff() {
+      const id1 = document.getElementById('select-t1').value;
+      const id2 = document.getElementById('select-t2').value;
+      const snap1 = appState.snapshots.find(s => s.id === id1);
+      const snap2 = appState.snapshots.find(s => s.id === id2);
+
+      if (!snap1 || !snap2) return;
+
+      const map1 = new Map(snap1.data.map(m => [m.name, m]));
+      const map2 = new Map(snap2.data.map(m => [m.name, m]));
+
+      diffResults = [];
+      let countNew = 0, countLeft = 0, countAfk = 0, totalDeltaCC = 0;
+      const groups = new Set();
+      const regions = new Set();
+
+      map2.forEach((curr, name) => {
+        groups.add(curr.group);
+        if (curr.region && curr.region !== '-') regions.add(curr.region);
+
+        const prev = map1.get(name);
+        let deltaCC = 0, deltaCH = 0, deltaTL = 0;
+        let status = 'NORMAL';
+
+        if (!prev) {
+          status = 'NEW';
+          countNew++;
+          deltaCC = curr.chienCong;
+          deltaCH = curr.congHien;
+          deltaTL = curr.theLuc;
+        } else {
+          deltaCC = curr.chienCong - prev.chienCong;
+          deltaCH = curr.congHien - prev.congHien;
+          deltaTL = curr.theLuc - prev.theLuc;
+
+          if (curr.group !== prev.group) {
+            status = 'CHANGED_GROUP';
+          } else if (deltaCC <= 0) {
+            status = 'AFK';
+            countAfk++;
+          }
+        }
+
+        totalDeltaCC += deltaCC;
+        diffResults.push({
+          name,
+          group: curr.group,
+          region: curr.region,
+          chienCong: curr.chienCong,
+          deltaCC,
+          congHien: curr.congHien,
+          deltaCH,
+          theLuc: curr.theLuc,
+          deltaTL,
+          status
+        });
+      });
+
+      map1.forEach((prev, name) => {
+        if (!map2.has(name)) {
+          countLeft++;
+          diffResults.push({
+            name,
+            group: prev.group,
+            region: prev.region,
+            chienCong: prev.chienCong,
+            deltaCC: 0,
+            congHien: prev.congHien,
+            deltaCH: 0,
+            theLuc: prev.theLuc,
+            deltaTL: 0,
+            status: 'LEFT'
+          });
+        }
+      });
+
+      document.getElementById('metric-total').innerText = map2.size;
+      document.getElementById('metric-new').innerText = countNew;
+      document.getElementById('metric-left').innerText = countLeft;
+      document.getElementById('metric-afk').innerText = countAfk;
+      document.getElementById('metric-delta-cc').innerText = totalDeltaCC.toLocaleString('vi-VN');
+
+      const selGroup = document.getElementById('filter-col-group');
+      const oldG = selGroup.value;
+      selGroup.innerHTML = '<option value="ALL">Tất cả</option>';
+      Array.from(groups).sort().forEach(g => selGroup.innerHTML += `<option value="${g}">${g}</option>`);
+      selGroup.value = oldG;
+
+      const selRegion = document.getElementById('filter-col-region');
+      const oldR = selRegion.value;
+      selRegion.innerHTML = '<option value="ALL">Tất cả</option>';
+      Array.from(regions).sort().forEach(r => selRegion.innerHTML += `<option value="${r}">${r}</option>`);
+      selRegion.value = oldR;
+
+      renderDiffTable();
+    }
+
+    function handleSort(field) {
+      if (sortState.field === field) {
+        sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortState.field = field;
+        sortState.dir = (field === 'deltaCC' || field === 'deltaCH' || field === 'theLuc') ? 'desc' : 'asc';
+      }
+      updateSortIcons();
+      renderDiffTable();
+    }
+
+    function updateSortIcons() {
+      ['name', 'group', 'region', 'deltaCC', 'deltaCH', 'theLuc', 'status', 'attendance'].forEach(f => {
+        const iconEl = document.getElementById(`sort-icon-${f}`);
+        if (!iconEl) return;
+        if (sortState.field === f) {
+          iconEl.innerText = sortState.dir === 'asc' ? '▲' : '▼';
+          iconEl.className = 'text-amber-400 font-bold';
+        } else {
+          iconEl.innerText = '↕';
+          iconEl.className = 'text-slate-600';
+        }
+      });
+    }
+
+    function resetDiffFilters() {
+      document.getElementById('filter-col-name').value = '';
+      document.getElementById('filter-col-group').value = 'ALL';
+      document.getElementById('filter-col-region').value = 'ALL';
+      document.getElementById('filter-col-mincc').value = '';
+      document.getElementById('filter-col-status').value = 'ALL';
+      document.getElementById('filter-col-attendance').value = 'ALL';
+      document.getElementById('filter-col-note').value = '';
+      renderDiffTable();
+    }
+
+    function renderDiffTable() {
+      const tbody = document.getElementById('diff-table-body');
+      
+      const fName = document.getElementById('filter-col-name').value.toLowerCase().trim();
+      const fGroup = document.getElementById('filter-col-group').value;
+      const fRegion = document.getElementById('filter-col-region').value;
+      const fMinCC = document.getElementById('filter-col-mincc').value !== '' ? Number(document.getElementById('filter-col-mincc').value) : null;
+      const fStatus = document.getElementById('filter-col-status').value;
+      const fAttendance = document.getElementById('filter-col-attendance').value;
+      const fNote = document.getElementById('filter-col-note').value.toLowerCase().trim();
+
+      let filtered = diffResults.filter(item => {
+        const meta = appState.memberNotes[item.name] || {};
+        const att = meta.attendance || 'DIEM_DANH';
+        const note = (meta.note || '').toLowerCase();
+
+        if (fName && !item.name.toLowerCase().includes(fName)) return false;
+        if (fGroup !== 'ALL' && item.group !== fGroup) return false;
+        if (fRegion !== 'ALL' && item.region !== fRegion) return false;
+        if (fMinCC !== null && item.deltaCC < fMinCC) return false;
+        if (fStatus !== 'ALL' && item.status !== fStatus) return false;
+        if (fAttendance !== 'ALL' && att !== fAttendance) return false;
+        if (fNote && !note.includes(fNote)) return false;
+
+        return true;
+      });
+
+      filtered.sort((a, b) => {
+        const metaA = appState.memberNotes[a.name] || {};
+        const metaB = appState.memberNotes[b.name] || {};
+        let valA, valB;
+
+        if (sortState.field === 'attendance') {
+          valA = metaA.attendance || 'DIEM_DANH';
+          valB = metaB.attendance || 'DIEM_DANH';
+        } else {
+          valA = a[sortState.field];
+          valB = b[sortState.field];
+        }
+
+        if (typeof valA === 'string') {
+          return sortState.dir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        }
+        return sortState.dir === 'asc' ? (valA - valB) : (valB - valA);
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-slate-500">Không tìm thấy thành viên nào khớp với bộ lọc.</td></tr>`;
+        return;
+      }
+
+      const formatDelta = (val) => {
+        if (val > 0) return `<span class="badge-diff-plus">+${val.toLocaleString('vi-VN')}</span>`;
+        if (val === 0) return `<span class="text-slate-500">0</span>`;
+        return `<span class="badge-diff-zero">${val.toLocaleString('vi-VN')}</span>`;
+      };
+
+      let html = '';
+      filtered.forEach(row => {
+        const meta = appState.memberNotes[row.name] || {};
+        const att = meta.attendance || 'DIEM_DANH';
+        const note = meta.note || '';
+
+        let badge = '<span class="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400">Bình thường</span>';
+        if (row.status === 'NEW') badge = '<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800">Mới vào bang</span>';
+        if (row.status === 'LEFT') badge = '<span class="px-2 py-0.5 rounded text-[10px] bg-rose-950 text-rose-400 border border-rose-800">Đã rời bang</span>';
+        if (row.status === 'CHANGED_GROUP') badge = '<span class="px-2 py-0.5 rounded text-[10px] bg-amber-950 text-amber-400 border border-amber-800">Đổi nhóm</span>';
+        if (row.status === 'AFK') badge = '<span class="px-2 py-0.5 rounded text-[10px] bg-red-950 text-red-400 border border-red-800 font-bold">Cảnh báo AFK</span>';
+
+        html += `
+          <tr class="hover:bg-slate-800/40 border-b border-slate-800/40 transition">
+            <td class="p-2.5 font-semibold text-slate-200">${row.name}</td>
+            <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-slate-800 text-amber-300 font-mono text-[11px]">${row.group}</span></td>
+            <td class="p-2.5 text-slate-400">${row.region}</td>
+            <td class="p-2.5 text-right">
+              <div>${row.chienCong.toLocaleString('vi-VN')}</div>
+              <div class="text-[11px]">${formatDelta(row.deltaCC)}</div>
+            </td>
+            <td class="p-2.5 text-right">
+              <div>${row.congHien.toLocaleString('vi-VN')}</div>
+              <div class="text-[11px]">${formatDelta(row.deltaCH)}</div>
+            </td>
+            <td class="p-2.5 text-right">
+              <div>${row.theLuc.toLocaleString('vi-VN')}</div>
+              <div class="text-[11px]">${formatDelta(row.deltaTL)}</div>
+            </td>
+            <td class="p-2.5 text-center">${badge}</td>
+            <td class="p-2.5">
+              <select onchange="saveMemberMetadata('${row.name}', 'attendance', this.value)" class="bg-slate-950 border border-slate-700 text-[11px] rounded px-2 py-1 text-slate-300 focus:outline-none focus:border-amber-400">
+                <option value="DIEM_DANH" ${att === 'DIEM_DANH' ? 'selected' : ''}>✅ Đủ</option>
+                <option value="XIN_PHEP" ${att === 'XIN_PHEP' ? 'selected' : ''}>🟡 Xin phép</option>
+                <option value="VANG_MAT" ${att === 'VANG_MAT' ? 'selected' : ''}>❌ Vắng</option>
+                <option value="DU_BI" ${att === 'DU_BI' ? 'selected' : ''}>🛡️ Dự bị</option>
+              </select>
+            </td>
+            <td class="p-2.5">
+              <input type="text" value="${note}" placeholder="Nhận xét..." onchange="saveMemberMetadata('${row.name}', 'note', this.value)" class="w-full bg-slate-950/70 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-amber-400">
+            </td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    function saveMemberMetadata(name, field, val) {
+      if (!appState.memberNotes[name]) appState.memberNotes[name] = {};
+      appState.memberNotes[name][field] = val;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+    }
+
+    // ================= BACKUP & REFRESH ALL =================
+    function exportFullBackup() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appState, null, 2));
+      const downloadAnchor = document.createElement('a');
+      const dateStr = new Date().toISOString().slice(0, 10);
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `HUYNH_DE_BACKUP_${dateStr}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function importBackupData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (parsed && Array.isArray(parsed.snapshots)) {
+            appState = parsed;
+            saveState();
+            alert("Khôi phục toàn bộ dữ liệu thành công!");
+            switchTab('group-dashboard');
+          } else {
+            alert("File backup không đúng định dạng!");
+          }
+        } catch (err) {
+          alert("Lỗi file: " + err.message);
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    function confirmResetAll() {
+      if (confirm("⚠️ CẢNH BÁO: Bạn có chắc chắn muốn XÓA TOÀN BỘ dữ liệu để bước vào mùa giải mới? Hãy nhớ tải file backup trước khi xóa!")) {
+        appState = { snapshots: [], memberNotes: {} };
+        localStorage.removeItem(STORAGE_KEY);
+        saveState();
+        alert("Đã làm sạch dữ liệu thành công!");
+        switchTab('storage');
+      }
+    }
+  </script>
+</body>
+</html>
